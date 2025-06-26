@@ -1,5 +1,5 @@
-# Use an official lightweight OpenJDK base image
-FROM eclipse-temurin:17-jdk-alpine
+# Start with a Maven builder image to build the app
+FROM maven:3.9.4-eclipse-temurin-17 AS build
 
 # Set working directory
 WORKDIR /app
@@ -7,11 +7,22 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Make mvnw executable & build the project
-RUN chmod +x mvnw && ./mvnw clean install -DskipTests
+# Build the project (skip tests to make it faster)
+RUN mvn clean package -DskipTests
 
-# Expose the port your app runs on (default Spring Boot port is 8080)
+# --------- Create a smaller image for running ---------
+
+# Use a lightweight JDK image for running the app
+FROM eclipse-temurin:17-jdk-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy only the built jar from the builder image
+COPY --from=build /app/target/*.jar app.jar
+
+# Expose default Spring Boot port
 EXPOSE 8080
 
-# Run the Spring Boot app
-CMD ["java", "-jar", "target/*.jar"]
+# Start the app
+CMD ["java", "-jar", "app.jar"]
